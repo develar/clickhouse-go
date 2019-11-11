@@ -11,11 +11,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/ClickHouse/clickhouse-go/lib/leakypool"
 
 	"github.com/ClickHouse/clickhouse-go/lib/binary"
 	"github.com/ClickHouse/clickhouse-go/lib/data"
@@ -39,7 +36,6 @@ var (
 	unixtime    int64
 	logOutput   io.Writer = os.Stdout
 	hostname, _           = os.Hostname()
-	poolInit    sync.Once
 )
 
 func init() {
@@ -95,7 +91,6 @@ func open(dsn string) (*clickhouse, error) {
 		readTimeout      = DefaultReadTimeout
 		writeTimeout     = DefaultWriteTimeout
 		connOpenStrategy = connOpenRandom
-		poolSize         = 100
 	)
 	if len(database) == 0 {
 		database = DefaultDatabase
@@ -129,12 +124,7 @@ func open(dsn string) (*clickhouse, error) {
 	if size, err := strconv.ParseInt(query.Get("block_size"), 10, 64); err == nil {
 		blockSize = int(size)
 	}
-	if size, err := strconv.ParseInt(query.Get("pool_size"), 10, 64); err == nil {
-		poolSize = int(size)
-	}
-	poolInit.Do(func() {
-		leakypool.InitBytePool(poolSize)
-	})
+
 	if altHosts := strings.Split(query.Get("alt_hosts"), ","); len(altHosts) != 0 {
 		for _, host := range altHosts {
 			if len(host) != 0 {
